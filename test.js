@@ -160,12 +160,6 @@ CarSimulator.prototype.start = function(){
 CarSimulator.prototype.initializeProps = function () {
     CarSimulator.currentCar = new Car();
 
-    let compA = new CarComponent('Engine', 'V8 Daddy Stroke 5.3');
-    new CarComponent('Fuel Tank', 'Thirsty Boi 20g');
-    new CarComponent('Engine', 'V8 QuadChad CX6')
-
-    compA.tempVal = 100
-    compA.setPrintValue('tempVal')
 }
 
 CarSimulator.prototype.createWindows = function () {
@@ -331,7 +325,7 @@ SimulatorContextWindow.prototype.clean = function(){
 }
 
 SimulatorContextWindow.prototype.initializeOverview = function(){
-    this.drawTextEx('Select a command\n from the list', 0, 0)
+    this.drawTextEx('Select a command\nfrom the list', 0, 0)
     this.onSelect = ()=>{}
 }
 

@@ -19,7 +19,10 @@ Engine.prototype.initializeProps = function(){
     this.hp = (this.torque * this.rpmMax) / 5252
     this.hp -= 60;
     this.hp = Math.floor(this.hp)
-    this.printValues = ['hp', 'cylinders', 'torque']
+    this.description = `A basic engine, 
+for a basic bitch.`
+    
+    this.printValues = ['hp', 'cylinders', 'torque', 'description']
 }
 
 Engine.prototype.rotate = function(){
