@@ -62,6 +62,10 @@ SimSettings.pageSettings = [
     },
     {
         name: 'componentList'
+    },
+    {
+        name: 'testDriveInstructions',
+        context: 'testDriveInstructions'
     }
 ]
 
@@ -126,6 +130,11 @@ SimSettings.windowSettings = [
         target: 'context',
         name: 'componentList',
         procedure: 'initializeComponentList'
+    },
+    {
+        target: 'context', 
+        name: 'testDriveInstructions',
+        procedure: 'setTestDriveInstructions'
     }
 
 ]
@@ -230,8 +239,31 @@ SimulatorDisplayWindow.prototype.initializeTestDrive = function(){
         Window_Base.prototype.update.call(this)
         this.clean();
         this.addText(car.getStatePrintout())
+        car.checkEvents()
+        this.updateGauges()
     }
     
+    this.drawGauges()
+}
+
+SimulatorDisplayWindow.prototype.drawGauges = function(){
+    let startY = this.y + this.padding + this.lineHeight() * 5;
+    let car = CarSimulator.currentCar;
+    let components = car.components;
+    let gauges;
+
+    for(let i = 0; i < components.length; i++){
+        gauges = components[i].gauges;
+        for(let j = 0; j < gauges.length; j++){
+            this.addChild(gauges[i].container)
+            gauges[i].container.position.set(this.x + this.padding, startY)+ (this.lineHeight() * i * j)
+            gauges[i].text.text = components[i].gaugeProps[j]
+        }
+    }
+}
+
+SimulatorDisplayWindow.prototype.updateGauges = function(){
+    carGauge.gauges.forEach(a => a.update())
 }
 
 SimulatorDisplayWindow.prototype.printComponentDetails = function(comp){
@@ -277,6 +309,7 @@ SimulatorDisplayWindow.prototype.onSelect = function(){
 
 
 
+
 function SimulatorContextWindow() {
     this.initialize.apply(this, arguments)
 }
@@ -308,6 +341,10 @@ SimulatorContextWindow.prototype.initializeComponentList = function(){
 
 SimulatorContextWindow.prototype.initializeTestDrive = function(){
 
+}
+
+SimulatorContextWindow.prototype.setTestDriveInstructions = function(){
+    this.drawTextEx('Enter: Turn on/off\nRight: Accelerate\nLeft: Brake\nX: Return', 0, 0)
 }
 
 SimulatorContextWindow.prototype.onSelect = function(){
@@ -386,11 +423,13 @@ SimulatorCommandWindow.prototype.activateController = function(){
         Window_Command.prototype.update.call(this)
         this.testDriveInputListener()
     }
-    //set cancel handler
-    this.setHandler('cancel', this.cancelController.bind(this))
+
+    SimSettings.page('testDriveInstructions')
+
 }
 
 SimulatorCommandWindow.prototype.cancelController = function(){
+    console.log('calling handler')
     this.update = function(){
         Window_Command.prototype.update.call(this)
     }
@@ -405,16 +444,20 @@ SimulatorCommandWindow.prototype.testDriveInputListener = function(){
         car.state.isTurnedOn = !car.state.isTurnedOn
     }
 
-    if(Input.isPressed('right')){
+    if(Input.isPressed('right') && car.state.isTurnedOn){
         car.state.isAccelerating = true;
     } else {
         car.state.isAccelerating = false;
     }
 
-    if(Input.isPressed('left')){
+    if(Input.isPressed('left') && car.state.isTurnedOn){
         car.state.isBraking = true;
     } else {
         car.state.isBraking = false;
+    }
+
+    if(Input.isTriggered('cancel')){
+        this.cancelController()
     }
     
 }
@@ -444,22 +487,101 @@ Car.prototype.initializeProps = function () {
     this.name = `Model #${Car.modelCount}`
     this.id = (Car.modelCount++).padZero(4)
     this.components = []
+    this.sharedProps = {
+        fuelEfficiencyModifier: 1,
+        speed: 0
+    }
     this.events = {
         onAccelerateEnter: [],
         onAccelerate: [],
         onAccelerateLeave: [],
+        onBrakeEnter: [],
+        onBrake: [],
+        onBrakeLeave: [],
         onDriveEnter: [],
         onDrive: [],
         onDriveLeave: [],
         onTurnOn: [],
-        onTurnOff: []
+        onTurnOff: [],
+        run: []
     }
+    this.previousState = {};
     this.state = {
         isTurnedOn: false,
         isDriving: false,
         isAccelerating: false,
         isBraking: false
     }
+}
+
+Car.prototype.checkEvents = function(){
+    this.acceleratorEvents()
+    this.driveEvents()
+    this.brakeEvents()
+    this.onOffEvents()
+    if(this.state.isTurnedOn)
+        this.runEvents(this.events.run)
+    this.previousState = Object.assign({}, this.state)
+}
+
+Car.prototype.runEvents = function(events){
+    events.forEach(a => a())
+}
+
+Car.prototype.acceleratorEvents = function(){
+    let state = this.state;
+    let previous = this.previousState;
+
+    if(state.isAccelerating){
+        this.runEvents(this.events.onAccelerate)
+        if(!previous.isAccelerating)
+            this.runEvents(this.events.onAccelerateEnter)
+    } else if(previous.isAccelerating){
+            this.runEvents(this.events.onAccelerateLeave)
+    }
+
+    
+}
+
+Car.prototype.driveEvents = function(){
+    let state = this.state;
+    let previous = this.previousState;
+
+    
+    if(state.isDriving){
+        this.runEvents(this.events.onDrive)
+        if(!previous.isDriving)
+            this.runEvents(this.events.onDriveEnter)
+    } else if(previous.isDriving){
+            this.runEvents(this.events.onDriveLeave)
+    }
+
+    
+}
+
+Car.prototype.brakeEvents = function(){
+    let state = this.state;
+    let previous = this.previousState;
+
+    if(state.isBraking){
+        this.runEvents(this.events.onBrake)
+        if(!previous.isBraking)
+            this.runEvents(this.events.onBrakeEnter)
+    } else if(previous.isBraking){
+            this.runEvents(this.events.onBrakeLeave)
+    }
+
+    
+}
+
+Car.prototype.onOffEvents = function(){
+    let state = this.state;
+    let previous = this.previousState;
+
+    if(state.isTurnedOn && !previous.isTurnedOn)
+        this.runEvents(this.events.onTurnOn)
+    else if(!state.isTurnedOn && previous.isTurnedOn)
+        this.runEvents(this.events.onTurnOff)
 }
 
 Car.prototype.getStatePrintout = function(){
@@ -484,7 +606,7 @@ Car.prototype.setEvent = function (eventName, cb) {
 
 Car.prototype.installComponent = function (component) {
     this.validateInstallComponent(component)
-    component.install()
+    component.install(this)
 }
 
 Car.prototype.validateInstallComponent = function (component) {
@@ -532,15 +654,21 @@ Car.prototype.ignition = function (start) {
 
 
 function CarComponent(type, name) {
+    this.initialize.apply(this, arguments)
+}
+
+CarComponent.prototype.initialize = function(type, name){
     this.type = type;
     this.name = name;
     this.gauges = [];
+    this.gaugeProps = [];
     this.printValues = [];
+    this.testValues = [];
 
     CarComponent.componentList.push(this)
 }
 
-CarComponent.prototype.install = function () {
+CarComponent.prototype.install = function (car) {
     try {
         throw new Error('NO INSTALL METHOD PROVIDED FOR THIS COMPONENT')
     }
@@ -549,8 +677,9 @@ CarComponent.prototype.install = function () {
     }
 }
 
-CarComponent.prototype.setGuage = function (propName, propCurrent, propMax) {
-    this.gauges.push(propName, propCurrent, propMax)
+CarComponent.prototype.setGauge = function (propName, propCurrent, propMax) {
+    this.gaugeProps.push(propName)
+    this.gauges.push(new carGauge(this, propCurrent, propMax))
 }
 
 CarComponent.prototype.setPrintValue = function(value){
@@ -573,12 +702,57 @@ CarComponent.prototype.getPrintout = function(){
 
 CarComponent.componentList = []
 
-CarComponent.create = function (type, name) {
-    let comp = new CarComponent(type, name)
 
-    this.componentList.push(comp)
-    return comp
+function carGauge(obj, cur, max){
+    this.obj = obj;
+    this.cur = cur;
+    this.max = max;
+    this.setupGraphics();
+    carGauge.gauges.push(this)
 }
 
+carGauge.gauges = [];
 
+carGauge.destroyGauges = function(){
+    let list = carGauge.gauges;
+    let length = list.length;
+    let scn = CarSimulator.scene;
+
+    for(let i = 0; i < length; i++){
+        scn.removeChild(list[i].container)
+        list[i].container.destroy(true)
+        list[i].container = undefined
+    }
+
+    carGauge.gauges = [];
+}
+
+carGauge.prototype.setupGraphics = function(){
+    let max = this.obj[this.max]
+    let cur = this.obj[this.cur]
+
+    this.container = new PIXI.Container;
+    this.back = new PIXI.Graphics;
+    this.back.lineStyle(2, 0x000000, 1)
+    this.back.beginFill(0x333333, 1)
+    this.back.drawRect(0, 0, Graphics.width * .1, Graphics.height * .05)
+
+    this.front = new PIXI.Graphics;
+    this.front.beginFill(0xFFFFFF, 1)
+    this.front.drawRect(0, 0, (Graphics.width * .1)  * (cur/max), Graphics.height * .05)
+
+    this.text = new PIXI.Text;
+    this.text.style.fill = 'white'
+    this.container.addChild(this.back, this.front, this.text)
+    this.text.x = this.back.width + Graphics.width * .02
+}
+
+carGauge.prototype.update = function(){
+    let max = this.obj[this.max]
+    let cur = this.obj[this.cur]
+
+    this.container.children[1].geometry.clear()
+    this.front.drawRect(0, 0, (Graphics.width * .1)  * (cur/max), Graphics.height * .05)
+    
+}
 
