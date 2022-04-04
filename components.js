@@ -55,6 +55,20 @@ Engine.prototype.install = function(car){
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
+function Transmission(){
+    this.initialize.apply(this, arguments)
+}
+
+Transmission.prototype = Object.create(CarComponent.prototype)
+
+Transmission.prototype.initialize = function(name){
+    CarComponent.prototype.initialize.call(this, 'Transmission', name)
+
+    this.cylinders = cylinders;
+    this.torque = torque
+
+    this.initializeProps()
+}
 
 
 
@@ -72,3 +86,4 @@ Engine.prototype.install = function(car){
 
 //Instantiate your Components Below
 new Engine('Basic Bitch V1', 4, 120, 100)
+new Transmission('Jenner1 Cuckrunner')
